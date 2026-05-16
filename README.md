@@ -1,33 +1,94 @@
-## Dependencies:
+# ThinkFast (SillyQ)
 
-1. node and npm: this are needed to run the program, npm is used to install additional dependencies. This can be downloaded from their respective websites.
-2. Express.js: To create an http server, use: npm install express
-3. ws: web sockets for communication between client and server; npm install ws
+A distributed, real-time multiplayer quiz game playable over a local area network. Compete with friends to answer questions fastest — earlier correct answers earn more points.
 
-## How to run
+---
 
-Once you have the dependencies installed run by the following command: node server.js
+## Features
 
-This will host the game server on the localhost on port 1234. Visit the address on any browser and start playing!
+- Real-time multiplayer over WebSockets (LAN only)
+- Live chat with typing indicators
+- Timestamp-based event ordering so the first correct answer is always rewarded fairly
+- Opponent activity updates (who solved a question, who's typing an answer)
 
-## Introduction
+---
 
-SillyQ is a distributed online multiplayer quiz game that you can play along with your friends as opponents or team but restricted within the local area network; if you want to play on two separate devices, it must be connected on the same network. Also, I have a chat system that you can use to do whatever you want to do.
+## Architecture
 
-The rules are pretty simple; you enter your name, and you start solving questions, and if anyone else gets connected to the server, you will be notified in the chat. And ifsomeone gets connected, you get updates from time to time of what other players are doing. Consider a two-player quiz game; the gist of the quiz questions or the project demonstrates that if someone solves(by pressing the ‘check’ button and it is correct) some question ‘X,’ first then, they receive more points than the other person.
+The server (`server.js`) acts as the single source of truth for all game state. Clients communicate with it exclusively via WebSocket messages encoded as JSON.
 
-## What Technologies have I used?
+### Distributed Systems concepts demonstrated
 
-I have used basic front-end technologies like HTML, CSS, Vanilla JS (in the start) and to be consistent with the front-end, I am using node.js/express as back-end server for this project. The communication protocol between client and server is written using Web Sockets API.
+**State synchronization** — all clients stay in sync by broadcasting state changes through the server rather than talking to each other directly.
 
+**Happened-before / event ordering** — when two players submit an answer at nearly the same time, the server uses a timestamp-ordered priority queue to determine which event arrived first. A short `setTimeout` window (5 s) collects concurrent `check` events before processing them, ensuring the earlier timestamp wins and receives full points while later submissions receive reduced points (−50 per subsequent correct answer).
 
-## What Distributed Computing problems have I addressed?
+### WebSocket message types
 
-I have tried to solve the main two distributed systems problems, how does synchronization work between more than two clients with message passing using the server as the main truth point. Another problem is timing the events according to some global clock or famously known as ‘happened before’ problem, i.e., event order based on the timestamp of some global clock. Both issues are fundamental in the design of a distributed system. 
+| Type | Direction | Description |
+|---|---|---|
+| `name` | client → server | Register player name on connect |
+| `next` | client ↔ server | Request / receive next question |
+| `check` | client → server | Submit an answer for grading |
+| `reply` | server → client | Answer result + points awarded |
+| `message` | client ↔ server | Chat message |
+| `typingMessage` | client ↔ server | Chat typing indicator |
+| `typingAnswer` | client ↔ server | Answer typing indicator |
+| `newClient` | server → client | Notify existing players of a new connection |
+| `end` | server → client | Quiz complete notification |
 
-Web Sockets API was also used in solving synchronization problem by throwing back and forth JSON objects from client to server and server to client.
+---
 
-For the second problem, I have used a priority queue to solve the problem, which is in increasing order of the received timestamp requests. To show what event came first, after
-receiving an event, I am using setTimeOut to wait for a few seconds to see if any event is happening or has already happened relatively at the same time. If the event has happened then, it enqueues it in the priority list in the proper place and responds to both the requests accordingly. The request that came first was timestamped and therefore, will be executed first, and that player will be awarded relatively more points. Even though node js is a singlethreaded application, I am adding all the events to the queue before executing, thus maintaining event ordering.
+## Prerequisites
 
-In a nutshell, I have tried to demonstrate two main problems in the design of distributed systems; synchronizing the state and ordering events or ‘happened before.’
+- [Node.js and npm](https://nodejs.org/)
+
+---
+
+## Setup
+
+```bash
+# Install dependencies
+npm install
+```
+
+---
+
+## Running
+
+```bash
+node server.js
+```
+
+The server listens on **port 1234**. Open `http://localhost:1234` in any browser on the same network to play.
+
+To play on two separate devices, both must be connected to the same local network. Other devices should navigate to `http://<host-machine-ip>:1234`.
+
+---
+
+## How to Play
+
+1. Enter your name and click **Start Quiz!** to load the first question.
+2. Type your answer in the answer box and click **Check** to submit.
+3. Click **Next** to advance to the next question (you can skip questions).
+4. The quiz ends after 10 questions. Your total score is shown at the end.
+
+**Scoring:** each question starts at 1000 points. Every correct submission reduces the point value by 50, so answering first always earns the most.
+
+---
+
+## Project Structure
+
+```
+.
+├── server.js      # Express + WebSocket server, game logic, priority queue
+├── index.html     # Single-page frontend (HTML/CSS/Vanilla JS)
+├── package.json
+└── QUESTIONS.pdf  # Original project brief
+```
+
+---
+
+## License
+
+[MIT](LICENSE)
